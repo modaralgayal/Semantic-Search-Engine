@@ -1,3 +1,5 @@
+from time import perf_counter
+
 import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
 
@@ -12,6 +14,7 @@ class SemanticSearch:
         self.best_result = ""
         self.best_res_score = 0
         self.best_res_idx = 0
+        self.time_measurements = []
 
         with open("products/products.txt") as f:
             for p in f:
@@ -20,9 +23,13 @@ class SemanticSearch:
         self.build_model()
 
     def build_model(self):
+        start = perf_counter()
         print("Loading model...")
         self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         print("Model Loaded!")
+        end = perf_counter()
+        time = end - start
+        print(f"Load model: {time}")
         return True
 
     def take_input(self):
@@ -38,9 +45,11 @@ class SemanticSearch:
         return True
 
     def create_embeddings(self, document_phrases, user_query):
-        self.top_scores, self.ranked_indices = embeddings.create_embeddings(
-            document_phrases, user_query, self.model
+        self.top_scores, self.ranked_indices, performance_report = (
+            embeddings.create_embeddings(document_phrases, user_query, self.model)
         )
+
+        self.time_measurements = self.time_measurements + performance_report
 
     def print_search_results(self):
 
@@ -79,12 +88,20 @@ class SemanticSearch:
         )
         plt.show()
 
+    def print_timing_results(self):
+        print("\n")
+        for stat in self.time_measurements:
+            print(stat)
+        print("\n")
+
     def run(self):
+        self.time_measurements = []
         if not self.take_input():
             return False
         self.create_embeddings(self.products, self.user_query)
         self.print_search_results()
-        self.visualize()
+        self.print_timing_results()
+        # self.visualize()
         return True
 
 
