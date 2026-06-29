@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
 
 import embeddings
@@ -8,6 +9,9 @@ class SemanticSearch:
         self.products = []
         self.top_scores = []
         self.ranked_indices = []
+        self.best_result = ""
+        self.best_res_score = 0
+        self.best_res_idx = 0
 
         with open("products/products.txt") as f:
             for p in f:
@@ -45,6 +49,10 @@ class SemanticSearch:
         print("=" * 80)
 
         for rank, idx in enumerate(self.ranked_indices, start=1):
+            if rank == 1:
+                self.best_res_score = self.top_scores[0][idx]
+                self.best_result = self.products[idx]
+                self.best_res_idx = idx
             print(
                 f"{rank:2}. {self.products[idx]:<55}"
                 f" Score: {self.top_scores[0][idx]:.3f}"
@@ -52,11 +60,31 @@ class SemanticSearch:
 
         print("=" * 80)
 
+        print(self.top_scores)
+
+    def visualize(self):
+        values = self.top_scores.tolist()[0]
+        fix, ax = plt.subplots()
+        ax.scatter(range(len(values)), values)
+        ax.set_ylim(-0.05, 1)
+        ax.annotate(
+            self.best_result,
+            xy=(self.best_res_idx, self.best_res_score),
+            xycoords="data",
+            xytext=(self.best_res_idx + 5, self.best_res_score - 0.15),
+            textcoords="data",
+            va="top",
+            ha="left",
+            arrowprops=dict(facecolor="black", shrink=0.05),
+        )
+        plt.show()
+
     def run(self):
         if not self.take_input():
             return False
         self.create_embeddings(self.products, self.user_query)
         self.print_search_results()
+        self.visualize()
         return True
 
 
