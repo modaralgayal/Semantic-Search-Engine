@@ -1,5 +1,6 @@
-import numpy as np
 from time import perf_counter
+
+import numpy as np
 
 # When transposed, the memory allocated for the array is no longer Fortran_Contiguous and becomes C_Contiguous
 
@@ -21,7 +22,7 @@ from time import perf_counter
 
 # print(b.base is a)
 
-
+"""
 n = 1000
 a = np.random.rand(n)
 b = np.random.rand(n, n)
@@ -57,3 +58,41 @@ walk = random_walk_fastest(1000000)
 print(walk)
 p = perf_counter()
 print("Loop method time: " , p - k)
+"""
+
+"""
+## Regular row-major order (default in python)
+lst_3dim = np.arange(1200000).reshape(40, 300, 100)
+
+# Row-major - C order (default)
+arr_c = np.array(lst_3dim, order="C")
+
+st = perf_counter()
+res = ""
+for k in arr_c:
+    for i in k:
+        for j in i:
+            res += str(j)
+# print(res)
+p = perf_counter()
+print("Row-major order retrieval time: ", p - st)
+
+# Column-major - Fortran order
+arr_f = np.array(lst_3dim, order="F")
+
+res = ""
+st = perf_counter()
+for k in arr_f:
+    for i in k:
+        for j in i:
+            res += str(j)
+# print(res)
+p = perf_counter()
+print("Column-major order retrieval time: ", p - st)
+
+
+# Row-major order retrieval time:  0.3624120149997907
+# Column-major order retrieval time:  0.36703175000002375
+
+# We see most times access speed in C order is always slightly faster than F order. 
+"""
