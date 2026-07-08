@@ -2,7 +2,6 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
-
 import embeddings
 
 
@@ -21,6 +20,7 @@ class SemanticSearch:
                 self.products.append(str(p.strip("\n")))
 
         self.build_model()
+        self.embeddings = embeddings.create_embeddings(self.products, self.model)
 
     def build_model(self):
         start = perf_counter()
@@ -44,9 +44,9 @@ class SemanticSearch:
         self.user_query = user_query
         return True
 
-    def create_embeddings(self, document_phrases, user_query):
+    def encode_query(self, user_query):
         self.top_scores, self.ranked_indices, performance_report = (
-            embeddings.create_embeddings(document_phrases, user_query, self.model)
+            embeddings.embed_user_query(self.embeddings, user_query, self.model)
         )
 
         self.time_measurements = self.time_measurements + performance_report
@@ -68,8 +68,6 @@ class SemanticSearch:
             )
 
         print("=" * 80)
-
-        print(self.top_scores)
 
     def visualize(self):
         values = self.top_scores.tolist()[0]
@@ -98,7 +96,7 @@ class SemanticSearch:
         self.time_measurements = []
         if not self.take_input():
             return False
-        self.create_embeddings(self.products, self.user_query)
+        self.encode_query(self.user_query)
         self.print_search_results()
         self.print_timing_results()
         # self.visualize()
