@@ -2,7 +2,9 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
+
 import embeddings
+from get_products import get_posts
 
 
 class SemanticSearch:
@@ -14,12 +16,9 @@ class SemanticSearch:
         self.best_res_score = 0
         self.best_res_idx = 0
         self.time_measurements = []
-
-        with open("products/products.txt") as f:
-            for p in f:
-                self.products.append(str(p.strip("\n")))
-
+        
         self.build_model()
+        self.products = get_posts()
         self.embeddings = embeddings.create_embeddings(self.products, self.model)
 
     def build_model(self):
