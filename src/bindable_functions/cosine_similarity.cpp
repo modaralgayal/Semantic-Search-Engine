@@ -1,27 +1,34 @@
-#include <iostream>
-#include <vector>
-#include <numeric>
-#include <cmath>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <pybind11/eigen.h>
+#include <Eigen/Dense>
 
 using namespace std;
+namespace py = pybind11;
+using Eigen::MatrixXd;
 const string NL = "\n";
 
-double dotProduct(vector<float>& vec1, vector<float>& vec2) {
-    return inner_product(vec1.begin(), vec1.end(), vec2.begin(), 0.0);
+MatrixXd normalize_embeddings(const MatrixXd& mat) {
+    MatrixXd result = mat; 
+    for (int i = 0; i < mat.rows(); i++) {
+        double normalized = mat.row(i).norm();
+        if (normalized > 0.0) {
+            result.row(i) /= normalized; 
+        }
+    }
+    return result;
 }
 
-double cosine_similarity(vector<float>& vec1, vector<float>& vec2) {
-    double dot = dotProduct(vec1, vec2);
-    double length = sqrt(dotProduct(vec1, vec1)) * sqrt(dotProduct(vec2, vec2));
+MatrixXd cosine_similarity(const MatrixXd& a, const MatrixXd& b) {
+    MatrixXd a_norm = normalize_embeddings(a);
+    MatrixXd b_norm = normalize_embeddings(b);
+    return a_norm * b_norm.transpose();
 
-    // cout << length << NL;
-
-    return dot / length; 
 }
 
-int main() {
-    vector<float> v1 = {1.0, 5.0, 6.7};
-    vector<float> v2 = {1.0, 23, 477};
-
-    cout << cosine_similarity(v1, v2) << NL;
+PYBIND11_MODULE(cosine_similarity, m, py::mod_gil_not_used()) {
+    m.doc() = "Cosine fimilarity function";
+    m.def("cosine_similarity", &cosine_similarity, 
+        "A function the returns the cosine similarity between to vectors."
+    );
 }

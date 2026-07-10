@@ -3,12 +3,15 @@ from setuptools import Extension, setup
 
 ext_modules = [
     Extension(
-        "example",
-        ["bindable_functions/example.cpp"],
-        include_dirs=[pybind11.get_include()],
+        "cosine_similarity",
+        ["bindable_functions/cosine_similarity.cpp"],
+        include_dirs=[
+            pybind11.get_include(),
+            "/usr/include/eigen3",
+        ],
         language="c++",
     )
 ]
 
 
-setup(name="example", version="0.1", ext_modules=ext_modules)
+setup(name="cosine_similarity", version="0.1", ext_modules=ext_modules)

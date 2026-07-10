@@ -1,0 +1,6 @@
+setup.py
+bindable_functions/cosine_similarity.cpp
+cosine_similarity.egg-info/PKG-INFO
+cosine_similarity.egg-info/SOURCES.txt
+cosine_similarity.egg-info/dependency_links.txt
+cosine_similarity.egg-info/top_level.txt
