@@ -7,31 +7,6 @@
 
 # Benchmark: `util.cos_sim` (Python) vs. Custom C++ (Pybind11 + `FlatIndex`)
 
-## Run 1 — Initial Comparison (Index Rebuilt Every Query)
-
-### Query
-
-> **"backpack"**
-
-### Timing Breakdown
-
-| Stage                            |   Time (ms) |
-| -------------------------------- | ----------: |
-| Query Encoding                   |      11.182 |
-| Similarity (util python library) |       6.061 |
-| Similarity (Pybind11 + C++)      |     141.909 |
-| **Total**                        | **159.152** |
-
-The C++ path was **~23x slower** here. Root cause: the C++ `cos_sim` function rebuilt the entire `FlatIndex` from scratch — copying every embedding into the index — on _every single query_. This wasn't a fair comparison, since `util.cos_sim` only ever operates on an already-existing tensor; it was never asked to redo the equivalent of "load the whole corpus" on each call.
-
-### Fix Applied
-
-Restructured the C++ binding so `FlatIndex` is built **once**, immediately after the corpus embeddings are computed, and each query only calls `index.search(...)` — mirroring exactly what `util.cos_sim` was already doing (operating on a pre-existing, already-embedded corpus).
-
----
-
-## Run 2 — After Fix: Index Built Once, Only Search Is Timed
-
 ### Query
 
 > **"Red charger model 3830"**
