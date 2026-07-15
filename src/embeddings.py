@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from time import perf_counter
 
-import cosine_similarity
+import cos_sim
 import numpy as np
 import torch
 from sentence_transformers import util
@@ -12,7 +12,17 @@ def create_embeddings(document_phrases, model):
     return embeddings
 
 
-def embed_user_query(embeddings, user_query, model):
+def build_flat_index(embeddings):
+    embeddings_np = embeddings.cpu().numpy()
+    dim = embeddings_np.shape[1]  # derived from data, not hardcoded
+
+    index = cos_sim.FlatIndex(dim)
+    for i, emb in enumerate(embeddings_np):
+        index.add(emb.tolist(), i)
+
+    return index
+
+def embed_user_query(index, embeddings, user_query, model):
     time_measurements = []
     total_time = [0.0]
 
@@ -21,13 +31,20 @@ def embed_user_query(embeddings, user_query, model):
 
     with timer("Similarity (util python library)", time_measurements, total_time):
         new_test_scores = util.cos_sim(query_embedding, embeddings)
+        py_ranked_indices = torch.argsort(new_test_scores[0], descending=True)[:10]
 
-    with timer("Sorting", time_measurements, total_time):
-        ranked_indices = torch.argsort(new_test_scores[0], descending=True)[:10]
+    with timer("Similarity (Pybind11 + C++)", time_measurements, total_time):
+        results = index.search(query_embedding.cpu().numpy().tolist(), 10)
+        cpp_ranked_indices = results.ids
+        cpp_scores = results.scores
 
-    time_measurements.append(f"Total time: {total_time[0]:.6f}s")
-    return new_test_scores, ranked_indices, time_measurements
+    time_measurements.append(f"Total time: {total_time[0] * 1000:.3f}ms")
 
+    return (
+        torch.tensor(cpp_scores),
+        torch.tensor(cpp_ranked_indices),
+        time_measurements,
+    )
 
 # the contextmanager makes sure some code (timer() function) run before a block of code.
 @contextmanager
@@ -35,19 +52,5 @@ def timer(label, log_list, totals):
     start = perf_counter()
     yield  # <-- The "with" part of the code starts running here.
     elapsed = perf_counter() - start
-    totals[0] += elapsed
-    log_list.append(f"{label}: {elapsed:.6f}s")
-
-
-def run():
-    vec = np.array([0.43535, 0.23256, 0.23252])
-    result = cosine_similarity.cosine_similarity(vec, vec)
-    result = torch.tensor(result)
-    ranked_indices = torch.argsort(result[0], descending=True)[:10]
-
-    print(ranked_indices)
-    return result
-
-
-if __name__ == "__main__":
-    run()
+    totals[0] += elapsed 
+    log_list.append(f"{label}: {elapsed*1000:.3f}ms")

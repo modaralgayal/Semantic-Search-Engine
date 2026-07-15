@@ -3,6 +3,9 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip> 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
 
 using namespace std;
 const string NL = "\n";
@@ -17,7 +20,7 @@ class FlatIndex {
     public: 
         FlatIndex(size_t dimension) : dim(dimension) {};
 
-        void add(const vector<float>& embedding, int id) {
+        void add(vector<float>& embedding, int id) {
             if (embedding.size() != dim) {
                 throw runtime_error("Embedding dimension mismatch");
             }
@@ -68,31 +71,28 @@ class FlatIndex {
 
     
 
-int main () {
-    vector<vector<float>> embeddings = {
-    {1.0, 0.0, 0.0}, 
-    {5.0, 0.0, 0.0}, 
-    {-1.0, 6.0, 0.0}, 
-    {-15.0, 0.0, 0.0}};
-
-    vector<float> query = {1.0,0.0,0.0};
-
-    const size_t dim = 3; 
+pair<vector<int>, vector<double>> cos_sim(vector<vector<float>>& embeddings, vector<float>& query) {
+    const size_t dim = embeddings[0].size(); 
     FlatIndex index(dim);
 
     for (size_t i = 0; i < embeddings.size(); i++) {
         index.add(embeddings[i], i);
     }
 
-    SearchResults results = index.search(query, 4);
+    SearchResults results = index.search(query, 10);
+    return {results.ids, results.scores};
+};
+
+namespace py = pybind11;
 
 
-    cout << "Query: [1, 0, 0]\n";
-    cout << "Rank  ID  Score\n";
+PYBIND11_MODULE(cos_sim, m) {
+    py::class_<FlatIndex>(m, "FlatIndex")
+        .def(py::init<size_t>())
+        .def("add", &FlatIndex::add)
+        .def("search", &FlatIndex::search);
 
-    for (size_t i = 0; i < results.ids.size(); i++) {
-        cout << (i + 1) << "     " << results.ids[i] << "   " << results.scores[i] << "\n";
-    }
-
-    return 0; 
+    py::class_<SearchResults>(m, "SearchResults")
+        .def_readonly("ids", &SearchResults::ids)
+        .def_readonly("scores", &SearchResults::scores);
 }
