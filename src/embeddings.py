@@ -14,9 +14,10 @@ def create_embeddings(document_phrases, model):
 
 def build_flat_index(embeddings):
     embeddings_np = embeddings.cpu().numpy()
-    dim = embeddings_np.shape[1]  # derived from data, not hardcoded
+    lib =  embeddings_np.shape[0]
+    dim = embeddings_np.shape[1] 
 
-    index = cos_sim.FlatIndex(dim)
+    index = cos_sim.FlatIndex(dim, lib)
     for i, emb in enumerate(embeddings_np):
         index.add(emb.tolist(), i)
 
@@ -33,8 +34,9 @@ def embed_user_query(index, embeddings, user_query, model):
         new_test_scores = util.cos_sim(query_embedding, embeddings)
         py_ranked_indices = torch.argsort(new_test_scores[0], descending=True)[:10]
 
+    c_query = query_embedding.cpu().numpy().tolist()
     with timer("Similarity (Pybind11 + C++)", time_measurements, total_time):
-        results = index.search(query_embedding.cpu().numpy().tolist(), 10)
+        results = index.search(c_query, 10)
         cpp_ranked_indices = results.ids
         cpp_scores = results.scores
 

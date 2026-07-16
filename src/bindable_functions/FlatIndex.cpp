@@ -18,35 +18,60 @@ struct SearchResults {
 
 class FlatIndex {
     public: 
-        FlatIndex(size_t dimension) : dim(dimension) {};
+        FlatIndex(size_t dimension, size_t library) 
+            : dim(dimension), lib(library), count(0) 
+        {
+            embeddings = new float*[lib];
+            embeddings[0] = new float[lib * dim];
 
-        void add(vector<float>& embedding, int id) {
+            for (size_t i = 1; i < lib; i++) {
+                embeddings[i] = embeddings[i-1] + dim;
+            }
+        }
+
+        ~FlatIndex() {
+            delete[] embeddings[0]; // free the single flat allocation
+            delete[] embeddings;    // free the array of row-pointers
+        }
+
+        void add(const vector<float>& embedding, int id) {
             if (embedding.size() != dim) {
                 throw runtime_error("Embedding dimension mismatch");
             }
-            embeddings.push_back(embedding);
+            if (count >= lib) {
+                throw runtime_error("Index is full");
+            }
+            double norm_sq = 0.0; 
+            for (size_t i = 0; i < dim; i++) norm_sq += embedding[i] * embedding[i];
+            norms.push_back(sqrt(norm_sq)); 
+            copy(embedding.begin(), embedding.end(), embeddings[count]);
             IDs.push_back(id);
+            count++; 
         };
 
         SearchResults search(vector<float>& query, size_t k) { 
-        vector<pair<double, int>> scores;
+        vector<pair<double, int>> sorted_scores;
         double score = 0.0; 
 
-        for (int i = 0; i < embeddings.size(); i++) {
-            score = similarity(query, embeddings[i]);
-            scores.push_back({score, IDs[i]});
+        double query_norm = 0.0;
+        for (size_t i = 0; i < dim; i++) query_norm += query[i] * query[i];
+
+        for (size_t i = 0; i < lib; i++) {
+            float* row_i = embeddings[i];
+            score = similarity(query.data(), row_i, i, sqrt(query_norm));
+            sorted_scores.push_back({score, IDs[i]});
         }
 
         // We sort ascending by score
-        sort(scores.begin(), scores.end(),
+        partial_sort(sorted_scores.begin(), sorted_scores.begin() + k, sorted_scores.end(),
         [](const pair<double,int>& a, pair<double,int>& b) {
             return a.first > b.first;
         });
 
         SearchResults results; 
-        for (size_t i = 0; i < k && i < scores.size(); i++) {
-            results.scores.push_back(scores[i].first);
-            results.ids.push_back(scores[i].second);
+        for (size_t i = 0; i < k && i < sorted_scores.size(); i++) {
+            results.scores.push_back(sorted_scores[i].first);
+            results.ids.push_back(sorted_scores[i].second);
         }
 
         return results; 
@@ -54,44 +79,32 @@ class FlatIndex {
 
     private:
         size_t dim;
-        vector<vector<float>> embeddings;
+        size_t lib;
+        size_t count;
+        vector<double> norms; 
+        float** embeddings;
+     
+
         vector<int> IDs;
             // calculate using cosine similarity
-    double similarity(vector<float>& query, vector<float>& embedding_vector) {
-        int n = query.size();
-        double dot = 0.0, denom_a = 0.0, denom_b = 0.0; 
-        for (int i = 0; i < n; i++) {
-            dot += query[i] * embedding_vector[i];
-            denom_a += query[i] * query[i];
-            denom_b += embedding_vector[i] * embedding_vector[i];
+    double similarity(const float* query, const float* embedding_vector, size_t i, double query_norm) {
+        // n is the dim
+        double dot = 0.0;
+        for (size_t j = 0; j < dim; j++) {
+            dot += query[j] * embedding_vector[j];
         }
+        return dot / (query_norm * norms[i]);
 
-        return dot / (sqrt(denom_a) * sqrt(denom_b));
     }};
 
-    
-
-pair<vector<int>, vector<double>> cos_sim(vector<vector<float>>& embeddings, vector<float>& query) {
-    const size_t dim = embeddings[0].size(); 
-    FlatIndex index(dim);
-
-    for (size_t i = 0; i < embeddings.size(); i++) {
-        index.add(embeddings[i], i);
-    }
-
-    SearchResults results = index.search(query, 10);
-    return {results.ids, results.scores};
-};
 
 namespace py = pybind11;
 
-
 PYBIND11_MODULE(cos_sim, m) {
     py::class_<FlatIndex>(m, "FlatIndex")
-        .def(py::init<size_t>())
+        .def(py::init<size_t, size_t>())
         .def("add", &FlatIndex::add)
         .def("search", &FlatIndex::search);
-
     py::class_<SearchResults>(m, "SearchResults")
         .def_readonly("ids", &SearchResults::ids)
         .def_readonly("scores", &SearchResults::scores);
