@@ -1,6 +1,0 @@
-setup.py
-bindable_functions/FlatIndex.cpp
-cos_sim.egg-info/PKG-INFO
-cos_sim.egg-info/SOURCES.txt
-cos_sim.egg-info/dependency_links.txt
-cos_sim.egg-info/top_level.txt
