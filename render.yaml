@@ -15,7 +15,4 @@ services:
     healthCheckPath: /api/health
     healthCheckInitialDelay: 90
 
-    envVars:
-      # Pin Python to 3.10 — the pre-built C++ .so targets cpython-310
-      - key: PYTHON_VERSION
-        value: 3.10.12
+    # Python version pinned via .python-version file (3.10)
