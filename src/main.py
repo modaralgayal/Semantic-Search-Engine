@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from sseClass import SemanticSearch
+from .sseClass import SemanticSearch
 
 
 # ── Request / Response models ──────────────────────────────────────────────

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from time import perf_counter
 
-import cos_sim
+from .. import cos_sim
 import numpy as np
 
 

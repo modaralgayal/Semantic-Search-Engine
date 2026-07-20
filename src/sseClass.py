@@ -1,4 +1,4 @@
-import components
+from . import components
 
 
 class SemanticSearch:
