@@ -1,110 +1,102 @@
-import components
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
+
+from sseClass import SemanticSearch
 
 
-class SemanticSearch:
-    def __init__(self):
-        self.products = []
-        self.top_scores = []
-        self.ranked_indices = []
-        self.best_result = ""
-        self.best_res_score = 0
-        self.best_res_idx = 0
-        self.time_measurements = []
+# ── Request / Response models ──────────────────────────────────────────────
 
-        if not self.build_model():
-            raise RuntimeError("Failed to build model")
-        self.products = components.get_products.get_posts()
-        self.embeddings = components.embeddings.create_embeddings(
-            self.products, self.model
-        )
-        self.index = components.embeddings.build_flat_index(self.embeddings)
-
-        if not self.initiate_faiss():
-            raise RuntimeError("Failed to initialize FAISS index")
-
-    def initiate_faiss(self):
-        self.faissIndexL2 = components.build_faiss_model.faissInitL2(self.embeddings)
-        self.faissIndexIVFF = components.build_faiss_model.faissInitIVFF(
-            self.embeddings
-        )
-        self.faissIndexIVFPQ = components.build_faiss_model.faissInitIVFPQ(
-            self.embeddings
-        )
-
-        return (
-            self.faissIndexL2 is not None
-            and self.faissIndexIVFF is not None
-            and self.faissIndexIVFPQ is not None
-        )
-
-    def build_model(self):
-        self.model = components.build_model.build_model()
-        return self.model is not None
-
-    def take_input(self):
-        try:
-            self.user_query = components.inp.take_input()
-        except ValueError as e:
-            print(e)
-            return True
-        return self.user_query is not None
-
-    def encode_query(self, user_query):
-        (
-            self.top_scores,
-            self.ranked_indices,
-            self.top_scoresivff,
-            self.ranked_indicesivff,
-            performance_report,
-        ) = components.embeddings.embed_user_query(
-            self.index,
-            self.embeddings,
-            user_query,
-            self.faissIndexL2,
-            self.faissIndexIVFF,
-            self.faissIndexIVFPQ,
-            self.model,
-        )
-
-        self.time_measurements = self.time_measurements + performance_report
-
-    def print_search_results(self):
-        components.print_res.print_search_results(
-            self.ranked_indices, self.top_scores, self.products
-        )
-
-        components.print_res.print_search_results(
-            self.ranked_indicesivff, self.top_scoresivff, self.products
-        )
-
-        return True
-
-    def visualize(self):
-        components.visualize(
-            self.top_scores, self.best_result, self.best_res_idx, self.best_res_score
-        )
-        return True
-
-    def print_timing_results(self):
-        print("\n")
-        for stat in self.time_measurements:
-            print(stat)
-        print("\n")
-
-    def run(self):
-        self.time_measurements = []
-        if not self.take_input():
-            return False
-        self.encode_query(self.user_query)
-        self.print_search_results()
-        self.print_timing_results()
-        # self.visualize()
-        return True
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=200, description="Search query")
 
 
-if __name__ == "__main__":
-    search_engine = SemanticSearch()
-    while True:
-        if not search_engine.run():
-            print("Goodbye!")
-            break
+class ResultItem(BaseModel):
+    rank: int
+    product: str
+    score: float
+
+
+class IndexResults(BaseModel):
+    label: str
+    results: list[ResultItem]
+
+
+class SearchResponse(BaseModel):
+    query: str
+    indexes: dict[str, IndexResults]
+    timing: list[str]
+
+
+# ── Singleton lifecycle ────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Initializing SemanticSearch singleton ...")
+    app.state.search_engine = SemanticSearch()
+    print("SemanticSearch initialised.")
+    yield
+    print("Shutting down.")
+
+
+app = FastAPI(title="Semantic Search Engine", lifespan=lifespan)
+templates = Jinja2Templates(directory="templates")
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+def _map_results(indices, scores, products) -> list[ResultItem]:
+    """Map index tensors to product names and return ranked result items."""
+    return [
+        ResultItem(rank=r + 1, product=products[idx], score=float(score))
+        for r, (idx, score) in enumerate(zip(indices, scores))
+    ]
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────
+
+@app.get("/")
+async def serve_ui(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
+
+
+@app.get("/api/health")
+async def health():
+    """Return OK when the search engine singleton is ready."""
+    engine: SemanticSearch = app.state.search_engine
+    return {"status": "ok", "products": len(engine.products)}
+
+
+@app.post("/api/search")
+async def search(body: SearchRequest):
+    engine: SemanticSearch = app.state.search_engine
+
+    # Reset timings before each call (encode_query appends, run() normally does this)
+    engine.time_measurements = []
+
+    # Run the search
+    engine.encode_query(body.query)
+
+    # Map results
+    ivfpq_results = _map_results(
+        engine.ranked_indices.tolist(),
+        engine.top_scores.tolist(),
+        engine.products,
+    )
+    ivff_results = _map_results(
+        engine.ranked_indicesivff.tolist(),
+        engine.top_scoresivff.tolist(),
+        engine.products,
+    )
+
+    return SearchResponse(
+        query=body.query,
+        indexes={
+            "ivfpq": IndexResults(label="FAISS IVFPQ", results=ivfpq_results),
+            "ivff": IndexResults(label="FAISS IVFF", results=ivff_results),
+        },
+        timing=engine.time_measurements,
+    )
