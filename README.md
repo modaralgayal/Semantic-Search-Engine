@@ -15,46 +15,36 @@ A semantic search engine that benchmarks multiple indexing strategies against on
 
 ## Pipeline
 
-```
-                          OFFLINE (startup)
+```mermaid
+flowchart TD
+    subgraph OFFLINE["⚙️ Offline — Startup"]
+        A["fastembed<br/>BAAI/bge-small-en-v1.5"]
+        B["Generate 10k random products"]
+        C["Build Embeddings (model.embed)"]
+        A --> B --> C
+    end
 
-  +-----------------------+    +----------------------+    +-----------------------------+
-  |  fastembed             |    |  Generate 10k        |    |  Build Embeddings           |
-  |  BAAI/bge-small-en-v1.5|    |  random products     |--->|  (model.embed)              |
-  +----------+------------+    +----------------------+    +-------------+---------------+
-             |                                                           |
-             |                                                           v
-             |                            +----------------------------------------------+
-             |                            |              Index Builders                 |
-             |                            |                                              |
-             |                            |  +----------------------------------------+  |
-             |                            |  |  C++ FlatIndex (pybind11)              |  |
-             |                            |  +----------------------------------------+  |
-             |                            |  |  FAISS IndexFlatL2                     |  |
-             |                            |  +----------------------------------------+  |
-             |                            |  |  FAISS IndexIVFF  (nlist=50)           |  |
-             |                            |  +----------------------------------------+  |
-             |                            |  |  FAISS IndexIVFPQ (m=8, bits=8)        |  |
-             |                            |  +----------------------------------------+  |
-             |                            +----------------------------------------------+
+    subgraph INDEXES["🗂️ Index Builders"]
+        D1["C++ FlatIndex (pybind11)"]
+        D2["FAISS IndexFlatL2"]
+        D3["FAISS IndexIVFF (nlist=50)"]
+        D4["FAISS IndexIVFPQ (m=8, bits=8)"]
+    end
 
-+------------+-----------------------------------------------------------------------------+
-|                             ONLINE (per query)                                          |
-|                                                                                         |
-|  +-------------+    +------------------+    +----------------------------------------+  |
-|  |  User Query  |--->|  Encode Query    |--->|    Search All Indexes                 |  |
-|  | (via API/UI) |    | (model.encode)   |    |  +----------+----------+----------+  |  |
-|  +-------------+    +------------------+    |  | C++ Flat | FAISS    | FAISS    |  |  |
-|                                              |  |          | IVFF     | IVFPQ    |  |  |
-|                                              |  +----------+----------+----------+  |  |
-|                                              +------------------+-------------------+  |
-|                                                                 v                       |
-|  +-------------+    +------------------+    +----------------------------+              |
-|  |  Web UI      |<---|  FastAPI JSON    |<---|  Collect Results + Timing  |              |
-|  |  (Jinja2)    |    |  /api/search     |    |  (ranked, mapped to        |              |
-|  |              |    |                  |    |   product names)           |              |
-|  +-------------+    +------------------+    +----------------------------+              |
-+---------------------------------------------------------------------------------------+
+    C --> INDEXES
+
+    subgraph ONLINE["🌐 Online — Per Query"]
+        F["User Query (via API/UI)"]
+        G["Encode Query (model.encode)"]
+        H["Search All Indexes"]
+        J["Collect Results + Timing"]
+        K["FastAPI JSON → /api/search"]
+        L["Web UI (Jinja2)"]
+        F --> G --> H
+        H --> J --> K --> L
+    end
+
+    INDEXES --> H
 ```
 
 ---
@@ -71,23 +61,23 @@ A semantic search engine that benchmarks multiple indexing strategies against on
 
 ## Architecture
 
-```
-src/
-  main.py                          # FastAPI server (lifespan, endpoints, UI)
-  sseClass.py                      # SemanticSearch orchestrator (singleton)
-  templates/
-    index.html                     # Web UI (search bar, results, timing)
-  components/
-    build_model.py                 # fastembed loader
-    embeddings.py                  # Embedding creation + query execution
-    build_faiss_model.py           # FAISS index initialisation
-    get_products.py                # Synthetic product data generator
-    input.py                       # CLI input handler
-    print_res.py                   # CLI result printer
-    visualize.py                   # Matplotlib scatter plot
-  bindable_functions/
-    FlatIndex.cpp                  # Custom C++ FlatIndex (pybind11)
-  setup.py                         # C++ extension build
+```mermaid
+flowchart TD
+    SRC["src/"] --> MAIN["main.py — FastAPI server"]
+    SRC --> SSE["sseClass.py — SemanticSearch orchestrator"]
+    SRC --> TEMPLATES["templates/"]
+    TEMPLATES --> HTML["index.html — Web UI (Jinja2)"]
+    SRC --> COMPONENTS["components/"]
+    COMPONENTS --> C1["build_model.py — fastembed loader"]
+    COMPONENTS --> C2["embeddings.py — Embeddings + query execution"]
+    COMPONENTS --> C3["build_faiss_model.py — FAISS init"]
+    COMPONENTS --> C4["get_products.py — Product generator"]
+    COMPONENTS --> C5["input.py — CLI input handler"]
+    COMPONENTS --> C6["print_res.py — CLI result printer"]
+    COMPONENTS --> C7["visualize.py — Matplotlib scatter"]
+    SRC --> BIND["bindable_functions/"]
+    BIND --> CPP["FlatIndex.cpp — C++ FlatIndex (pybind11)"]
+    SRC --> SETUP["setup.py — C++ extension build"]
 ```
 
 ### Indexes
@@ -202,6 +192,15 @@ Returns:
 | FAISS FlatIndexL2                |     2.108 |
 | Similarity (util python library) |     3.594 |
 | Similarity (Pybind11 + C++)      |     5.644 |
+
+```mermaid
+%%{init: { 'themeVariables': { 'fontSize': '14px' } } }%%
+xychart-beta
+    title "Query Time per Index (ms) — lower is better"
+    x-axis ["FAISS IVFF", "FAISS IVFPQ", "FAISS FlatL2", "Python util", "Pybind11 C++"]
+    y-axis "Time (ms)" 0 --> 6.5
+    bar [0.076, 0.086, 2.108, 3.594, 5.644]
+```
 
 ---
 
