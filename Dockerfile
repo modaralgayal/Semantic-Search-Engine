@@ -20,8 +20,8 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BA
 # Copy the application source
 COPY . .
 
-# Build the C++ extension
-RUN pip install -e src/
+# Build the C++ extension (pybind11 must be installed as a pip package for setup.py)
+RUN pip install pybind11 && pip install -e src/
 
 # Render sets $PORT automatically; fall back to 7860 for Hugging Face Spaces
 EXPOSE 7860
