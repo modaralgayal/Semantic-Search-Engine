@@ -7,12 +7,13 @@ services:
     plan: free
 
     # Build
-    buildCommand: pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
 
     # Run — Render sets $PORT automatically
     startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
 
     healthCheckPath: /api/health
+    healthCheckInitialDelay: 90
 
     envVars:
       # Pin Python to 3.10 — the pre-built C++ .so targets cpython-310

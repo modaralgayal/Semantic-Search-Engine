@@ -534,7 +534,7 @@
     }
 
     .timing-bar.encoding  { background: linear-gradient(90deg, #6366f1, #818cf8); }
-    .timing-bar.python    { background: linear-gradient(90deg, #059669, #22c55e); }
+    .timing-bar.numpy    { background: linear-gradient(90deg, #059669, #22c55e); }
     .timing-bar.cpp       { background: linear-gradient(90deg, #d97706, #f59e0b); }
     .timing-bar.l2        { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
     .timing-bar.ivff      { background: linear-gradient(90deg, #0891b2, #22d3ee); }
@@ -682,7 +682,7 @@
   <!-- ── Footer ─────────────────────────────────────────────────── -->
   <footer>
     <div class="container">
-      <span>Built with FAISS &middot; Sentence Transformers &middot; C++ FlatIndex</span>
+      <span>Built with FAISS &middot; fastembed (BGE-small-en) &middot; C++ FlatIndex</span>
     </div>
   </footer>
 
@@ -850,7 +850,7 @@
         let cssClass = '';
         const lc = label.toLowerCase();
         if (lc.includes('encoding'))     cssClass = 'encoding';
-        else if (lc.includes('python'))  cssClass = 'python';
+        else if (lc.includes('numpy'))   cssClass = 'numpy';
         else if (lc.includes('pybind') || lc.includes('c++')) cssClass = 'cpp';
         else if (lc.includes('flat') || lc.includes('l2'))    cssClass = 'l2';
         else if (lc.includes('ivff'))    cssClass = 'ivff';

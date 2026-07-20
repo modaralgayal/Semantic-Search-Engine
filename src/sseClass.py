@@ -13,14 +13,25 @@ class SemanticSearch:
 
         if not self.build_model():
             raise RuntimeError("Failed to build model")
+
+        print("Generating product names...")
         self.products = components.get_products.get_posts()
+        print(f"Generated {len(self.products)} product names")
+
+        print("Creating embeddings (this may take a while)...")
         self.embeddings = components.embeddings.create_embeddings(
             self.products, self.model
         )
-        self.index = components.embeddings.build_flat_index(self.embeddings)
+        print(f"Embeddings created: {self.embeddings.shape}")
 
+        print("Building flat index...")
+        self.index = components.embeddings.build_flat_index(self.embeddings)
+        print("Flat index built")
+
+        print("Initializing FAISS indexes...")
         if not self.initiate_faiss():
             raise RuntimeError("Failed to initialize FAISS index")
+        print("FAISS indexes ready")
 
     def initiate_faiss(self):
         self.faissIndexL2 = components.build_faiss_model.faissInitL2(self.embeddings)

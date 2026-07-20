@@ -3,22 +3,21 @@ from time import perf_counter
 
 import cos_sim
 import numpy as np
-import torch
-from sentence_transformers import util
 
 
 def create_embeddings(document_phrases, model):
-    embeddings = model.encode(document_phrases, convert_to_tensor=True)
-    return embeddings
+    print(f"  Encoding {len(document_phrases)} documents...")
+    embeddings = list(model.embed(document_phrases, batch_size=256))
+    print("  Encoding complete, converting to array...")
+    return np.array(embeddings, dtype=np.float32)
 
 
 def build_flat_index(embeddings):
-    embeddings_np = embeddings.cpu().numpy()
-    lib = embeddings_np.shape[0]
-    dim = embeddings_np.shape[1]
+    lib = embeddings.shape[0]
+    dim = embeddings.shape[1]
 
     index = cos_sim.FlatIndex(dim, lib)
-    for i, emb in enumerate(embeddings_np):
+    for i, emb in enumerate(embeddings):
         index.add(emb.tolist(), i)
 
     return index
@@ -31,19 +30,21 @@ def embed_user_query(
     total_time = [0.0]
 
     with timer("Query Encoding", time_measurements, total_time):
-        query_embedding = model.encode(user_query, convert_to_tensor=True)
+        query_embedding = list(model.query_embed(user_query))[0]
 
-    with timer("Similarity (util python library)", time_measurements, total_time):
-        new_test_scores = util.cos_sim(query_embedding, embeddings)
-        py_ranked_indices = torch.argsort(new_test_scores[0], descending=True)[:10]
+    with timer("Similarity (Python numpy)", time_measurements, total_time):
+        query_norm = query_embedding / np.linalg.norm(query_embedding)
+        embeddings_norm = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+        new_test_scores = np.dot(embeddings_norm, query_norm)
+        py_ranked_indices = np.argsort(new_test_scores)[::-1][:10]
 
     with timer("Similarity (Pybind11 + C++)", time_measurements, total_time):
-        c_query = query_embedding.cpu().numpy().tolist()
+        c_query = query_embedding.tolist()
         results = index.search(c_query, 10)
         cpp_ranked_indices = results.ids
         cpp_scores = results.scores
 
-    f_query = query_embedding.cpu().numpy().astype("float32").reshape(1, -1)
+    f_query = query_embedding.astype("float32").reshape(1, -1)
     with timer("FAISS FlatIndexL2", time_measurements, total_time):
         D, I = faissIndexL2.search(f_query, k=10)
 
@@ -56,10 +57,10 @@ def embed_user_query(
     time_measurements.append(f"Total time: {total_time[0] * 1000:.3f}ms")
 
     return (
-        torch.tensor(D[0]),
-        torch.tensor(I[0]),
-        torch.tensor(DIVFF[0]),
-        torch.tensor(IIVFF[0]),
+        D[0],
+        I[0],
+        DIVFF[0],
+        IIVFF[0],
         time_measurements,
     )
 

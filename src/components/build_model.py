@@ -1,11 +1,11 @@
 from time import perf_counter
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 
 def build_model():
     start = perf_counter()
     print("Loading model...")
-    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     print("Model Loaded!")
     end = perf_counter()
     time = end - start

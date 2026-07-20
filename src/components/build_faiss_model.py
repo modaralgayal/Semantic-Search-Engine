@@ -5,7 +5,7 @@ import faiss
 
 
 def faissInitL2(embeddings):
-    embeddings_np = embeddings.cpu().numpy().astype("float32")
+    embeddings_np = embeddings.astype("float32")
     dim = embeddings_np.shape[1]
     faissIndex = faiss.IndexFlatL2(dim)
     faissIndex.add(embeddings_np)
@@ -14,7 +14,7 @@ def faissInitL2(embeddings):
 
 # We can sacrifice a little bit of accuracy for performance.
 def faissInitIVFF(embeddings):
-    embeddings_np = embeddings.cpu().numpy().astype("float32")
+    embeddings_np = embeddings.astype("float32")
     dim = embeddings_np.shape[1]
     quantizer = faiss.IndexFlatL2(dim)
 
@@ -29,7 +29,7 @@ def faissInitIVFF(embeddings):
 
 
 def faissInitIVFPQ(embeddings):
-    embeddings_np = embeddings.cpu().numpy().astype("float32")
+    embeddings_np = embeddings.astype("float32")
     dim = embeddings_np.shape[1]
     quantizer = faiss.IndexFlatL2(dim)
 
