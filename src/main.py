@@ -1,10 +1,4 @@
-from time import perf_counter
-
-import matplotlib.pyplot as plt
-from sentence_transformers import SentenceTransformer
-
-import embeddings
-from get_products import get_posts
+import components
 
 
 class SemanticSearch:
@@ -17,72 +11,71 @@ class SemanticSearch:
         self.best_res_idx = 0
         self.time_measurements = []
 
-        self.build_model()
-        self.products = get_posts()
-        self.embeddings = embeddings.create_embeddings(self.products, self.model)
-        self.index = embeddings.build_flat_index(self.embeddings)  # built ONCE
+        if not self.build_model():
+            raise RuntimeError("Failed to build model")
+        self.products = components.get_products.get_posts()
+        self.embeddings = components.embeddings.create_embeddings(
+            self.products, self.model
+        )
+        self.index = components.embeddings.build_flat_index(self.embeddings)
+
+        if not self.initiate_faiss():
+            raise RuntimeError("Failed to initialize FAISS index")
+
+    def initiate_faiss(self):
+        self.faissIndexL2 = components.build_faiss_model.faissInitL2(self.embeddings)
+        self.faissIndexIVFF = components.build_faiss_model.faissInitIVFF(
+            self.embeddings
+        )
+
+        return self.faissIndexIVFF is not None and self.faissIndexL2 is not None
 
     def build_model(self):
-        start = perf_counter()
-        print("Loading model...")
-        self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-        print("Model Loaded!")
-        end = perf_counter()
-        time = end - start
-        print(f"Load model: {time}")
-        return True
+        self.model = components.build_model.build_model()
+        return self.model is not None
 
     def take_input(self):
-        user_query = str(input("Enter your query here (c to exit): "))
-
-        if user_query.strip().lower() == "c":
-            return False
-
-        if len(user_query) == 0 or len(user_query) > 30:
-            raise ValueError("Invalid input: Either empty or too large.")
-
-        self.user_query = user_query
-        return True
+        try:
+            self.user_query = components.inp.take_input()
+        except ValueError as e:
+            print(e)
+            return True
+        return self.user_query is not None
 
     def encode_query(self, user_query):
-        self.top_scores, self.ranked_indices, performance_report = (
-            embeddings.embed_user_query(self.index, self.embeddings, user_query, self.model)
+        (
+            self.top_scores,
+            self.ranked_indices,
+            self.top_scoresivff,
+            self.ranked_indicesivff,
+            performance_report,
+        ) = components.embeddings.embed_user_query(
+            self.index,
+            self.embeddings,
+            user_query,
+            self.faissIndexL2,
+            self.faissIndexIVFF,
+            self.model,
         )
 
         self.time_measurements = self.time_measurements + performance_report
 
     def print_search_results(self):
-        print("\n" + "=" * 80)
-        print("TOP SEARCH RESULTS")
-        print("=" * 80)
+        components.print_res.print_search_results(
+            self.ranked_indices, self.top_scores, self.products
+        )
 
-        for rank, (idx, score) in enumerate(
-            zip(self.ranked_indices, self.top_scores), start=1
-        ):
-            if rank == 1:
-                self.best_res_score = score
-                self.best_result = self.products[idx]
-                self.best_res_idx = idx
-            print(f"{rank:2}. {self.products[idx]:<55}" f" Score: {score:.3f}")
+        components.print_res.print_search_results(
+            self.ranked_indicesivff, self.top_scoresivff, self.products
+        )
 
-        print("=" * 80)
+        return True
 
     def visualize(self):
-        values = self.top_scores.tolist()[0]
-        fix, ax = plt.subplots()
-        ax.scatter(range(len(values)), values)
-        ax.set_ylim(-0.05, 1)
-        ax.annotate(
-            self.best_result,
-            xy=(self.best_res_idx, self.best_res_score),
-            xycoords="data",
-            xytext=(self.best_res_idx + 5, self.best_res_score - 0.15),
-            textcoords="data",
-            va="top",
-            ha="left",
-            arrowprops=dict(facecolor="black", shrink=0.05),
+        components.visualize(
+            self.top_scores, self.best_result, self.best_res_idx, self.best_res_score
         )
-        plt.show()
+        return True
 
     def print_timing_results(self):
         print("\n")
