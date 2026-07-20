@@ -1,3 +1,10 @@
+import json
+import os
+from pathlib import Path
+
+import faiss
+import numpy as np
+
 from . import components
 
 
@@ -14,39 +21,34 @@ class SemanticSearch:
         if not self.build_model():
             raise RuntimeError("Failed to build model")
 
-        print("Generating product names...", flush=True)
-        self.products = components.get_products.get_posts()
-        print(f"Generated {len(self.products)} product names", flush=True)
+        self._load_precomputed_data()
 
-        print("Creating embeddings (this may take a while)...", flush=True)
-        self.embeddings = components.embeddings.create_embeddings(
-            self.products, self.model
-        )
-        print(f"Embeddings created: {self.embeddings.shape}", flush=True)
+    def _load_precomputed_data(self):
+        """Load pre-computed data instead of computing at startup."""
+        data_dir = Path(__file__).resolve().parent / "data"
 
+        # Load products
+        print("Loading products...", flush=True)
+        with open(data_dir / "products.json") as f:
+            self.products = json.load(f)
+        print(f"Loaded {len(self.products)} products", flush=True)
+
+        # Load embeddings
+        print("Loading embeddings...", flush=True)
+        self.embeddings = np.load(data_dir / "embeddings.npy")
+        print(f"Embeddings loaded: {self.embeddings.shape}", flush=True)
+
+        # Build custom flat index from loaded embeddings (fast, ~0.01s)
         print("Building flat index...", flush=True)
         self.index = components.embeddings.build_flat_index(self.embeddings)
         print("Flat index built", flush=True)
 
-        print("Initializing FAISS indexes...", flush=True)
-        if not self.initiate_faiss():
-            raise RuntimeError("Failed to initialize FAISS index")
-        print("FAISS indexes ready", flush=True)
-
-    def initiate_faiss(self):
-        self.faissIndexL2 = components.build_faiss_model.faissInitL2(self.embeddings)
-        self.faissIndexIVFF = components.build_faiss_model.faissInitIVFF(
-            self.embeddings
-        )
-        self.faissIndexIVFPQ = components.build_faiss_model.faissInitIVFPQ(
-            self.embeddings
-        )
-
-        return (
-            self.faissIndexL2 is not None
-            and self.faissIndexIVFF is not None
-            and self.faissIndexIVFPQ is not None
-        )
+        # Load FAISS indexes from pre-computed files
+        print("Loading FAISS indexes...", flush=True)
+        self.faissIndexL2 = faiss.read_index(str(data_dir / "faiss_l2.index"))
+        self.faissIndexIVFF = faiss.read_index(str(data_dir / "faiss_ivff.index"))
+        self.faissIndexIVFPQ = faiss.read_index(str(data_dir / "faiss_ivfpq.index"))
+        print("FAISS indexes loaded", flush=True)
 
     def build_model(self):
         self.model = components.build_model.build_model()
