@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -43,7 +44,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Semantic Search Engine", lifespan=lifespan)
-templates = Jinja2Templates(directory="templates")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(_HERE, "templates"))
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
