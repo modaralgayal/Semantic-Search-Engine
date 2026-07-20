@@ -1,0 +1,14 @@
+__pycache__
+.git
+.gitignore
+.claude
+__pycache__
+*.egg-info
+build
+dist
+sse
+test_files_c++
+test_files_py
+render.yaml
+Dockerfile
+.dockerignore

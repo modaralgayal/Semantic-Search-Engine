@@ -1,3 +1,12 @@
+---
+title: Semantic Search Engine
+emoji: 🔍
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # SSE Benchmark -- Semantic Search Engine
 
 A semantic search engine that benchmarks multiple indexing strategies against one another -- from a custom C++ FlatIndex to FAISS IVF indexes -- all served through a FastAPI web UI.
@@ -10,8 +19,8 @@ A semantic search engine that benchmarks multiple indexing strategies against on
                           OFFLINE (startup)
 
   +-----------------------+    +----------------------+    +-----------------------------+
-  | SentenceTransformer   |    |  Generate 10k        |    |  Build Embeddings           |
-  | all-MiniLM-L6-v2      |    |  random products     |--->|  (model.encode)             |
+  |  fastembed             |    |  Generate 10k        |    |  Build Embeddings           |
+  |  BAAI/bge-small-en-v1.5|    |  random products     |--->|  (model.embed)              |
   +----------+------------+    +----------------------+    +-------------+---------------+
              |                                                           |
              |                                                           v
@@ -69,7 +78,7 @@ src/
   templates/
     index.html                     # Web UI (search bar, results, timing)
   components/
-    build_model.py                 # SentenceTransformer loader
+    build_model.py                 # fastembed loader
     embeddings.py                  # Embedding creation + query execution
     build_faiss_model.py           # FAISS index initialisation
     get_products.py                # Synthetic product data generator
