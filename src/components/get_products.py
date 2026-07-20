@@ -26,6 +26,6 @@ def get_posts():
 
     document_phrases = [
         f"{np.random.choice(adjectives)} {np.random.choice(nouns)} model {i}"
-        for i in range(10000)  # scale this up as needed: 1k, 10k, 100k, 1M
+        for i in range(1000)  # scaled down for Render Free tier (1k instead of 10k)
     ]
     return document_phrases

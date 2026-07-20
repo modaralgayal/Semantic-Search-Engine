@@ -18,9 +18,9 @@ def faissInitIVFF(embeddings):
     dim = embeddings_np.shape[1]
     quantizer = faiss.IndexFlatL2(dim)
 
-    # nlist represents how many culsters (voronoi cells)
-    # my index puts vectors into.
-    nlist = 50
+    # nlist = number of Voronoi cells (clusters).
+    # sqrt(n_vectors) ≈ 30 for 1000 vectors
+    nlist = 30
     index = faiss.IndexIVFFlat(quantizer, dim, nlist)
     index.train(embeddings_np)
     index.add(embeddings_np)
@@ -33,7 +33,7 @@ def faissInitIVFPQ(embeddings):
     dim = embeddings_np.shape[1]
     quantizer = faiss.IndexFlatL2(dim)
 
-    nlist = 50
+    nlist = 30
     m = 8
     bits = 8
     index = faiss.IndexIVFPQ(quantizer, dim, nlist, m, bits)
