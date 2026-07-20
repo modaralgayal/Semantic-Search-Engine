@@ -1,44 +1,201 @@
-# Semantic-Search-Engine
+# SSE Benchmark -- Semantic Search Engine
 
-## General Information
+A semantic search engine that benchmarks multiple indexing strategies against one another -- from a custom C++ FlatIndex to FAISS IVF indexes -- all served through a FastAPI web UI.
 
-- This is a Semantic Search Engine that uses cosine similarity to find the suitable
-  search result for the user input.
+---
 
-# Benchmark: `util.cos_sim` (Python) vs. Custom C++ (Pybind11 + `FlatIndex`)
+## Pipeline
 
-### Query
+```
+                          OFFLINE (startup)
 
-> **"Red charger model 3830"**
+  +-----------------------+    +----------------------+    +-----------------------------+
+  | SentenceTransformer   |    |  Generate 10k        |    |  Build Embeddings           |
+  | all-MiniLM-L6-v2      |    |  random products     |--->|  (model.encode)             |
+  +----------+------------+    +----------------------+    +-------------+---------------+
+             |                                                           |
+             |                                                           v
+             |                            +----------------------------------------------+
+             |                            |              Index Builders                 |
+             |                            |                                              |
+             |                            |  +----------------------------------------+  |
+             |                            |  |  C++ FlatIndex (pybind11)              |  |
+             |                            |  +----------------------------------------+  |
+             |                            |  |  FAISS IndexFlatL2                     |  |
+             |                            |  +----------------------------------------+  |
+             |                            |  |  FAISS IndexIVFF  (nlist=50)           |  |
+             |                            |  +----------------------------------------+  |
+             |                            |  |  FAISS IndexIVFPQ (m=8, bits=8)        |  |
+             |                            |  +----------------------------------------+  |
+             |                            +----------------------------------------------+
 
-### Top Search Results
++------------+-----------------------------------------------------------------------------+
+|                             ONLINE (per query)                                          |
+|                                                                                         |
+|  +-------------+    +------------------+    +----------------------------------------+  |
+|  |  User Query  |--->|  Encode Query    |--->|    Search All Indexes                 |  |
+|  | (via API/UI) |    | (model.encode)   |    |  +----------+----------+----------+  |  |
+|  +-------------+    +------------------+    |  | C++ Flat | FAISS    | FAISS    |  |  |
+|                                              |  |          | IVFF     | IVFPQ    |  |  |
+|                                              |  +----------+----------+----------+  |  |
+|                                              +------------------+-------------------+  |
+|                                                                 v                       |
+|  +-------------+    +------------------+    +----------------------------+              |
+|  |  Web UI      |<---|  FastAPI JSON    |<---|  Collect Results + Timing  |              |
+|  |  (Jinja2)    |    |  /api/search     |    |  (ranked, mapped to        |              |
+|  |              |    |                  |    |   product names)           |              |
+|  +-------------+    +------------------+    +----------------------------+              |
++---------------------------------------------------------------------------------------+
+```
 
-| Rank | Product                | Score |
-| ---: | ---------------------- | ----: |
-|    1 | Red Charger model 3830 | 1.000 |
-|    2 | Red Charger model 3747 | 0.932 |
-|    3 | Red Charger model 3686 | 0.925 |
-|    4 | Red Charger model 3714 | 0.921 |
-|    5 | Red Charger model 3207 | 0.916 |
-|    6 | Red Charger model 3629 | 0.915 |
-|    7 | Red Charger model 5839 | 0.915 |
-|    8 | Red Charger model 30   | 0.915 |
-|    9 | Red Charger model 3668 | 0.914 |
-|   10 | Red Charger model 377  | 0.908 |
+---
 
-### Timing Breakdown
+## Features
 
-| Stage                            |  Time (ms) |
-| -------------------------------- | ---------: |
-| Query Encoding                   |     20.369 |
-| Similarity (util python library) |      3.993 |
-| Similarity (Pybind11 + C++)      |      6.101 |
-| **Total**                        | **30.464** |
+- **5 search strategies** compared per query -- C++ FlatIndex, FAISS FlatL2, FAISS IVFF, FAISS IVFPQ, and Python cosine similarity
+- **Web UI** with side-by-side result comparison and ranked timing breakdown
+- **REST API** -- single endpoint, structured JSON responses
+- **Benchmarking built-in** -- every query measures and reports timing for each index
+- **10k product catalog** -- random synthetic data (8 categories x 8 product types x model numbers)
 
-## Conclusion
+---
 
-Once the index-construction cost was removed from the per-query timing, the picture changes substantially:
+## Architecture
 
-- These results are taken in sample size of 10k. The top result is a perfect match (score 1.000), confirming the underlying cosine similarity math is correct on both implementations.
-- `util.cos_sim` is faster (3.993ms vs. 6.101ms) — roughly 1.5x — but the two implementations are in the same performance ballpark for this corpus size and query.
-- The remaining gap is a reasonable target for further investigation — likely attributable to util.cos_sim dispatching to a BLAS-backed, SIMD-vectorized, possibly multi-threaded batched matrix multiply, versus the custom C++ implementation's simpler per-row loop.
+```
+src/
+  main.py                          # FastAPI server (lifespan, endpoints, UI)
+  sseClass.py                      # SemanticSearch orchestrator (singleton)
+  templates/
+    index.html                     # Web UI (search bar, results, timing)
+  components/
+    build_model.py                 # SentenceTransformer loader
+    embeddings.py                  # Embedding creation + query execution
+    build_faiss_model.py           # FAISS index initialisation
+    get_products.py                # Synthetic product data generator
+    input.py                       # CLI input handler
+    print_res.py                   # CLI result printer
+    visualize.py                   # Matplotlib scatter plot
+  bindable_functions/
+    FlatIndex.cpp                  # Custom C++ FlatIndex (pybind11)
+  setup.py                         # C++ extension build
+```
+
+### Indexes
+
+| Index | Type | Training | Speed | Accuracy |
+|-------|------|----------|-------|----------|
+| Python util.cos_sim | Flat (brute-force) | None | *** | Exact |
+| C++ FlatIndex | Flat (brute-force) | None | *** | Exact |
+| FAISS FlatL2 | Flat (L2 distance) | None | *** | Exact |
+| FAISS IVFF | IVF (50 Voronoi cells) | Required | ***** | ~99% |
+| FAISS IVFPQ | IVF + PQ (8 sub-vectors) | Required | ****** | ~97% |
+
+---
+
+## Quick Start
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Build the C++ extension
+pip install -e .
+
+# Start the server
+cd src
+uvicorn main:app --reload
+```
+
+Open [http://localhost:8000](http://localhost:8000) -- the search engine loads automatically (model download + index building takes ~10-30s on first run).
+
+### API
+
+```bash
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "wireless headphones"}'
+```
+
+Returns:
+
+```json
+{
+  "query": "wireless headphones",
+  "indexes": {
+    "ivfpq": {
+      "label": "FAISS IVFPQ",
+      "results": [
+        {"rank": 1, "product": "Wireless Headphones model 42", "score": 0.8523}
+      ]
+    },
+    "ivff": {
+      "label": "FAISS IVFF",
+      "results": [
+        {"rank": 1, "product": "Wireless Headphones model 42", "score": 0.8511}
+      ]
+    }
+  },
+  "timing": [
+    "FAISS IVFPQ: 0.987ms",
+    "FAISS IVFF: 1.234ms",
+    "FAISS FlatIndexL2: 3.456ms",
+    "Similarity (Pybind11 + C++): 5.678ms",
+    "Similarity (util python library): 15.234ms"
+  ]
+}
+```
+
+> Timing entries are returned in the order they are measured by the engine and **sorted fastest -> slowest in the UI**.
+
+---
+
+## Benchmark Results
+
+**Query:** "heavy-duty keyboard" -- 10k product corpus.
+
+### FAISS IVFPQ (top 10)
+
+| Rank | Product                        | Distance |
+| ---: | ------------------------------ | -------: |
+|    1 | Heavy-duty Keyboard model 4903 |   0.2227 |
+|    2 | Heavy-duty Keyboard model 8153 |   0.2307 |
+|    3 | Heavy-duty Keyboard model 1235 |   0.2322 |
+|    4 | Heavy-duty Keyboard model 2515 |   0.2377 |
+|    5 | Heavy-duty Keyboard model 2689 |   0.2386 |
+|    6 | Heavy-duty Keyboard model 5587 |   0.2393 |
+|    7 | Heavy-duty Keyboard model 2943 |   0.2395 |
+|    8 | Heavy-duty Keyboard model 2106 |   0.2443 |
+|    9 | Heavy-duty Keyboard model 2139 |   0.2447 |
+|   10 | Heavy-duty Keyboard model 657  |   0.2453 |
+
+### FAISS IVFF (top 10)
+
+| Rank | Product                        | Distance |
+| ---: | ------------------------------ | -------: |
+|    1 | Heavy-duty Keyboard model 6593 |   0.2408 |
+|    2 | Heavy-duty Keyboard model 6569 |   0.2427 |
+|    3 | Heavy-duty Keyboard model 7529 |   0.2531 |
+|    4 | Heavy-duty Keyboard model 5587 |   0.2578 |
+|    5 | Heavy-duty Keyboard model 1235 |   0.2617 |
+|    6 | Heavy-duty Keyboard model 7129 |   0.2665 |
+|    7 | Heavy-duty Keyboard model 5274 |   0.2676 |
+|    8 | Heavy-duty Keyboard model 150  |   0.2681 |
+|    9 | Heavy-duty Keyboard model 9374 |   0.2687 |
+|   10 | Heavy-duty Keyboard model 4913 |   0.2713 |
+
+### Timing comparison (ranked by speed)
+
+| Stage                            | Time (ms) |
+| -------------------------------- | --------: |
+| FAISS IVFF                       |     0.076 |
+| FAISS IVFPQ                      |     0.086 |
+| FAISS FlatIndexL2                |     2.108 |
+| Similarity (util python library) |     3.594 |
+| Similarity (Pybind11 + C++)      |     5.644 |
+
+---
+
+## License
+
+MIT
