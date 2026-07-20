@@ -6,9 +6,9 @@ import numpy as np
 
 
 def create_embeddings(document_phrases, model):
-    print(f"  Encoding {len(document_phrases)} documents...")
+    print(f"  Encoding {len(document_phrases)} documents...", flush=True)
     embeddings = list(model.embed(document_phrases, batch_size=256))
-    print("  Encoding complete, converting to array...")
+    print("  Encoding complete, converting to array...", flush=True)
     return np.array(embeddings, dtype=np.float32)
 
 

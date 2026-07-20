@@ -36,11 +36,11 @@ class SearchResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Initializing SemanticSearch singleton ...")
+    print("Initializing SemanticSearch singleton ...", flush=True)
     app.state.search_engine = SemanticSearch()
-    print("SemanticSearch initialised.")
+    print("SemanticSearch initialised.", flush=True)
     yield
-    print("Shutting down.")
+    print("Shutting down.", flush=True)
 
 
 app = FastAPI(title="Semantic Search Engine", lifespan=lifespan)

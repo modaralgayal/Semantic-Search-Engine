@@ -4,10 +4,10 @@ from fastembed import TextEmbedding
 
 def build_model():
     start = perf_counter()
-    print("Loading model...")
+    print("Loading model...", flush=True)
     model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-    print("Model Loaded!")
+    print("Model Loaded!", flush=True)
     end = perf_counter()
     time = end - start
-    print(f"Load model: {time}")
+    print(f"Load model: {time}", flush=True)
     return model
