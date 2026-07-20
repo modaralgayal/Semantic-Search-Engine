@@ -27,8 +27,15 @@ class SemanticSearch:
         self.faissIndexIVFF = components.build_faiss_model.faissInitIVFF(
             self.embeddings
         )
+        self.faissIndexIVFPQ = components.build_faiss_model.faissInitIVFPQ(
+            self.embeddings
+        )
 
-        return self.faissIndexIVFF is not None and self.faissIndexL2 is not None
+        return (
+            self.faissIndexL2 is not None
+            and self.faissIndexIVFF is not None
+            and self.faissIndexIVFPQ is not None
+        )
 
     def build_model(self):
         self.model = components.build_model.build_model()
@@ -55,6 +62,7 @@ class SemanticSearch:
             user_query,
             self.faissIndexL2,
             self.faissIndexIVFF,
+            self.faissIndexIVFPQ,
             self.model,
         )
 
