@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
@@ -63,6 +63,12 @@ def _map_results(indices, scores, products) -> list[ResultItem]:
 @app.get("/")
 async def serve_ui(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
+
+
+@app.head("/")
+async def head_ui():
+    """HEAD handler for uptime monitors (UptimeRobot)."""
+    return Response(status_code=200)
 
 
 @app.get("/api/health")

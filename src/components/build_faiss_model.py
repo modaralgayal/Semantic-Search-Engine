@@ -10,6 +10,12 @@ def faissInitL2(embeddings):
     faissIndex.add(embeddings_np)
     return faissIndex
 
+"""
+
+
+
+"""
+
 
 def faissInitIVFF(embeddings):
     embeddings_np = embeddings.astype("float32")
@@ -23,6 +29,12 @@ def faissInitIVFF(embeddings):
     index.train(embeddings_np)
     index.add(embeddings_np)
     return index
+
+"""
+
+
+
+"""
 
 
 def faissInitIVFPQ(embeddings):
@@ -46,3 +58,11 @@ def faissInitIVFPQ(embeddings):
     index.train(embeddings_np)
     index.add(embeddings_np)
     return index
+
+"""
+
+
+
+"""
+
+
